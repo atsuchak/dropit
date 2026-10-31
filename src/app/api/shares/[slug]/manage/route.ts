@@ -1,13 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { shares } from '@/features/shares/server/model'
 import { hashPin, randomId, tokenHash } from '@/features/shares/server/security'
-import { deleteObjects, objectSize, uploadUrl } from '@/lib/server/storage'
+import {
+  deleteObjects,
+  downloadUrls,
+  objectSize,
+  uploadUrls,
+} from '@/lib/server/storage'
 
 export const runtime = 'nodejs'
 
 function ownerToken(request: NextRequest) {
   const token = request.headers.get('authorization')?.replace(/^Bearer /, '')
   return token && /^[A-Za-z0-9_-]{32}$/.test(token) ? token : null
+}
+
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ slug: string }> },
+) {
+  try {
+    const { slug } = await context.params
+    const token = ownerToken(request)
+    if (!/^(?:[a-z]{11}|[A-Za-z0-9_-]{12})$/.test(slug) || !token)
+      return NextResponse.json({ error: 'Share unavailable.' }, { status: 404 })
+    const collection = await shares()
+    const share = await collection.findOne({
+      slug,
+      uploadTokenHash: tokenHash(token),
+      status: 'ready',
+      expiresAt: { $gt: new Date() },
+    })
+    if (!share)
+      return NextResponse.json({ error: 'Share unavailable.' }, { status: 410 })
+    const imageFiles = share.files.filter((file) =>
+      file.type.startsWith('image/'),
+    )
+    const previewUrls = imageFiles.length
+      ? await downloadUrls(
+          imageFiles.map((file) => file.key),
+          300,
+        )
+      : []
+    const previews = new Map(
+      imageFiles.map((file, index) => [file.key, previewUrls[index]]),
+    )
+    const files = share.files.map(({ key, name, size, type }) => ({
+      key,
+      name,
+      size,
+      type,
+      ...(previews.has(key) ? { previewUrl: previews.get(key) } : {}),
+    }))
+    return NextResponse.json(
+      { files, expiresAt: share.expiresAt, accessLimit: share.accessLimit },
+      { headers: { 'Cache-Control': 'no-store' } },
+    )
+  } catch {
+    return NextResponse.json(
+      { error: 'Could not load share.' },
+      { status: 500 },
+    )
+  }
 }
 
 export async function POST(
@@ -115,13 +169,7 @@ export async function POST(
       }
     }
 
-    const uploads = await Promise.all(
-      pending.map(async (file) => ({
-        key: file.key,
-        url: await uploadUrl(file.key, file.type, file.size),
-        type: file.type,
-      })),
-    )
+    const uploads = await uploadUrls(pending)
     return NextResponse.json(
       { uploads },
       { headers: { 'Cache-Control': 'no-store' } },

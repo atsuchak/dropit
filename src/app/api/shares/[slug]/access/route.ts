@@ -5,7 +5,7 @@ import {
   tokenHash,
   verifyTurnstile,
 } from '@/features/shares/server/security'
-import { downloadUrl } from '@/lib/server/storage'
+import { downloadUrls } from '@/lib/server/storage'
 
 export const runtime = 'nodejs'
 
@@ -97,14 +97,16 @@ export async function POST(
         { error: 'This share has expired.' },
         { status: 410 },
       )
-    const files = await Promise.all(
-      share.files.map(async (file) => ({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        url: await downloadUrl(file.key, Math.min(60, seconds)),
-      })),
+    const urls = await downloadUrls(
+      share.files.map((file) => file.key),
+      Math.min(60, seconds),
     )
+    const files = share.files.map((file, index) => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      url: urls[index],
+    }))
     return NextResponse.json(
       { files, expiresAt: share.expiresAt },
       { headers: { 'Cache-Control': 'no-store' } },

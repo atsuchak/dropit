@@ -9,6 +9,23 @@ import { Turnstile } from './turnstile'
 const MAX_BYTES = 100 * 1024 * 1024
 const MAX_FILES = 20
 const DURATION_PRESETS = ['1m', '5m', '30m', '1h', '6h', '12h'] as const
+const SAVED_SHARE_KEY = 'dropit-current-share'
+
+type SavedFile = {
+  key: string
+  name: string
+  size: number
+  type: string
+  previewUrl?: string
+}
+type SelectedFile = File | SavedFile
+type Owner = { slug: string; token: string }
+type SavedShare = Owner & {
+  expiresAt: string
+  durationInput: string
+  accessLimit: number
+  pin: string
+}
 
 function parseDuration(value: string) {
   const match = /^(\d+)\s*([smh])$/i.exec(value.trim())
@@ -18,13 +35,16 @@ function parseDuration(value: string) {
   return minutes >= 1 && minutes <= 720 ? minutes : null
 }
 
-function SelectedFilePreview({ file }: { file: File }) {
+function SelectedFilePreview({ file }: { file: SelectedFile }) {
   const image = useRef<HTMLImageElement>(null)
   useEffect(() => {
     if (!file.type.startsWith('image/')) return
-    const url = URL.createObjectURL(file)
-    if (image.current) image.current.src = url
-    return () => URL.revokeObjectURL(url)
+    const url =
+      file instanceof File ? URL.createObjectURL(file) : file.previewUrl
+    if (image.current && url) image.current.src = url
+    return () => {
+      if (file instanceof File && url) URL.revokeObjectURL(url)
+    }
   }, [file])
 
   return (
@@ -77,9 +97,9 @@ async function filesFromEntry(entry: Entry): Promise<File[]> {
 export function UploadForm({ siteKey }: { siteKey?: string }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
-  const [files, setFiles] = useState<File[]>([])
+  const [files, setFiles] = useState<SelectedFile[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<
-    { file: File; key: string }[]
+    { file: SelectedFile; key: string }[]
   >([])
   const [durationInput, setDurationInput] = useState('5m')
   const [accessLimit, setAccessLimit] = useState(1)
@@ -92,10 +112,10 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
   const [expiresAt, setExpiresAt] = useState('')
   const [qr, setQr] = useState('')
   const [copied, setCopied] = useState(false)
-  const [owner, setOwner] = useState<{ slug: string; token: string } | null>(
-    null,
-  )
+  const [owner, setOwner] = useState<Owner | null>(null)
   const [editing, setEditing] = useState(false)
+  const [expired, setExpired] = useState(false)
+  const [restoring, setRestoring] = useState(true)
   const [notice, setNotice] = useState('')
   const [savedSettings, setSavedSettings] = useState({
     durationInput: '5m',
@@ -106,6 +126,123 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
 
   const onToken = useCallback((value: string) => setToken(value), [])
   const durationMinutes = parseDuration(durationInput)
+
+  useEffect(() => {
+    const restore = async () => {
+      await Promise.resolve()
+      const raw = sessionStorage.getItem(SAVED_SHARE_KEY)
+      if (!raw) {
+        setRestoring(false)
+        return
+      }
+      let saved: SavedShare
+      try {
+        saved = JSON.parse(raw) as SavedShare
+      } catch {
+        sessionStorage.removeItem(SAVED_SHARE_KEY)
+        setRestoring(false)
+        return
+      }
+      if (
+        !/^[a-z]{11}$/.test(saved.slug) ||
+        !/^[A-Za-z0-9_-]{32}$/.test(saved.token)
+      ) {
+        sessionStorage.removeItem(SAVED_SHARE_KEY)
+        setRestoring(false)
+        return
+      }
+      const shareLink = `${window.location.origin}/${saved.slug}`
+      setOwner({ slug: saved.slug, token: saved.token })
+      setLink(shareLink)
+      setExpiresAt(saved.expiresAt)
+      setDurationInput(saved.durationInput)
+      setAccessLimit(saved.accessLimit)
+      setPin(saved.pin)
+      setSavedSettings({
+        durationInput: saved.durationInput,
+        accessLimit: saved.accessLimit,
+        pin: saved.pin,
+      })
+      if (new Date(saved.expiresAt).getTime() <= Date.now()) {
+        setExpired(true)
+      }
+      try {
+        const response = await fetch(`/api/shares/${saved.slug}/manage`, {
+          headers: { Authorization: `Bearer ${saved.token}` },
+          cache: 'no-store',
+        })
+        if (response.status === 410 || response.status === 404) {
+          setExpired(true)
+          return
+        }
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error)
+        const restored = (data.files as SavedFile[]).map((file) => ({
+          file,
+          key: file.key,
+        }))
+        setUploadedFiles(restored)
+        setFiles(restored.map(({ file }) => file))
+        setExpiresAt(data.expiresAt)
+        setExpired(false)
+        setAccessLimit(data.accessLimit)
+        setSavedSettings((current) => ({
+          ...current,
+          accessLimit: data.accessLimit,
+        }))
+        setQr(
+          await QRCode.toDataURL(shareLink, {
+            margin: 2,
+            width: 220,
+            color: { dark: '#111915', light: '#ffffff' },
+          }),
+        )
+      } catch {
+        setError('Could not restore this share. Try reloading.')
+      } finally {
+        setRestoring(false)
+      }
+    }
+    void restore()
+  }, [])
+
+  useEffect(() => {
+    if (!owner || expired || !expiresAt) return
+    const markExpired = () => {
+      setExpired(true)
+      setQr('')
+    }
+    const checkStatus = async (expireOnFailure = false) => {
+      try {
+        const response = await fetch(`/api/shares/${owner.slug}/status`, {
+          cache: 'no-store',
+        })
+        if (!response.ok) throw new Error('Status unavailable.')
+        const data = await response.json()
+        if (!data.active || new Date(data.expiresAt).getTime() <= Date.now()) {
+          markExpired()
+        } else if (data.expiresAt !== expiresAt) {
+          setExpiresAt(data.expiresAt)
+        }
+      } catch {
+        if (expireOnFailure) markExpired()
+      }
+    }
+    const timer = window.setTimeout(
+      () => void checkStatus(true),
+      Math.max(0, new Date(expiresAt).getTime() - Date.now()),
+    )
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void checkStatus()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    const interval = window.setInterval(() => void checkStatus(), 20_000)
+    return () => {
+      clearTimeout(timer)
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [owner, expiresAt, expired])
 
   useEffect(() => {
     if (link)
@@ -145,6 +282,8 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
 
   async function createShare() {
     if (!files.length || busy || durationMinutes === null) return
+    const newFiles = files.filter((file): file is File => file instanceof File)
+    if (newFiles.length !== files.length) return
     setBusy(true)
     setError('')
     setNotice('')
@@ -153,7 +292,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          files: files.map((file) => ({
+          files: newFiles.map((file) => ({
             name: file.name,
             size: file.size,
             type: file.type,
@@ -166,8 +305,14 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
       })
       const prepared = await response.json()
       if (!response.ok) throw new Error(prepared.error)
+      const shareLink = `${window.location.origin}/${prepared.slug}`
+      const qrPromise = QRCode.toDataURL(shareLink, {
+        margin: 2,
+        width: 220,
+        color: { dark: '#111915', light: '#ffffff' },
+      }).catch(() => '')
       await Promise.all(
-        files.map(async (file, index) => {
+        newFiles.map(async (file, index) => {
           const upload = prepared.uploads[index]
           const result = await fetch(upload.url, {
             method: 'PUT',
@@ -187,11 +332,10 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
       })
       const finished = await finishedResponse.json()
       if (!finishedResponse.ok) throw new Error(finished.error)
-      const shareLink = `${window.location.origin}/${finished.slug}`
       setCopied(false)
       setSavedSettings({ durationInput, accessLimit, pin })
       setUploadedFiles(
-        files.map((file, index) => ({
+        newFiles.map((file, index) => ({
           file,
           key: prepared.uploads[index].key,
         })),
@@ -199,17 +343,21 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
       setOwner({ slug: finished.slug, token: prepared.uploadToken })
       setExpiresAt(finished.expiresAt)
       setLink(shareLink)
-      try {
-        setQr(
-          await QRCode.toDataURL(shareLink, {
-            margin: 2,
-            width: 220,
-            color: { dark: '#111915', light: '#ffffff' },
-          }),
-        )
-      } catch {
+      sessionStorage.setItem(
+        SAVED_SHARE_KEY,
+        JSON.stringify({
+          slug: finished.slug,
+          token: prepared.uploadToken,
+          expiresAt: finished.expiresAt,
+          durationInput,
+          accessLimit,
+          pin,
+        } satisfies SavedShare),
+      )
+      const readyQr = await qrPromise
+      setQr(readyQr)
+      if (!readyQr)
         setError('Link is ready, but the QR code could not be created.')
-      }
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : 'Could not create share.',
@@ -228,7 +376,9 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
     try {
       const kept = uploadedFiles.filter(({ file }) => files.includes(file))
       const added = files.filter(
-        (file) => !uploadedFiles.some((uploaded) => uploaded.file === file),
+        (file): file is File =>
+          file instanceof File &&
+          !uploadedFiles.some((uploaded) => uploaded.file === file),
       )
       let uploads: { key: string; url: string; type: string }[] = []
       if (added.length) {
@@ -286,6 +436,16 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
       ])
       setSavedSettings({ durationInput, accessLimit, pin })
       setExpiresAt(data.expiresAt)
+      sessionStorage.setItem(
+        SAVED_SHARE_KEY,
+        JSON.stringify({
+          ...owner,
+          expiresAt: data.expiresAt,
+          durationInput,
+          accessLimit,
+          pin,
+        } satisfies SavedShare),
+      )
       setNotice(
         data.pendingCleanup
           ? 'Saved. File cleanup is pending.'
@@ -317,13 +477,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error)
-      setFiles([])
-      setUploadedFiles([])
-      setLink('')
-      setExpiresAt('')
-      setQr('')
-      setOwner(null)
-      setEditing(false)
+      resetHome()
       setToken('')
       setChallengeReset((value) => value + 1)
       setNotice(
@@ -340,16 +494,41 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
     }
   }
 
+  function resetHome() {
+    sessionStorage.removeItem(SAVED_SHARE_KEY)
+    setFiles([])
+    setUploadedFiles([])
+    setLink('')
+    setExpiresAt('')
+    setQr('')
+    setOwner(null)
+    setEditing(false)
+    setExpired(false)
+    setError('')
+    setNotice('')
+    setToken('')
+    setChallengeReset((value) => value + 1)
+  }
+
+  if (restoring)
+    return (
+      <div className="panel options-panel" role="status">
+        Opening your share…
+      </div>
+    )
+
   return (
     <div className="upload-layout">
       <section className="panel upload-panel">
         <span className="eyebrow">PRIVATE FILE SHARING</span>
         <h1>
-          {editing
-            ? 'Update your files.'
-            : link
-              ? 'Files ready.'
-              : 'Drop files. Get a link.'}
+          {expired
+            ? 'Link expired.'
+            : editing
+              ? 'Update your files.'
+              : link
+                ? 'Files ready.'
+                : 'Drop files. Get a link.'}
         </h1>
         {(!link || editing) && (
           <>
@@ -404,7 +583,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
             <p className="hint">Up to 20 files · 100 MB total</p>
           </>
         )}
-        {files.length > 0 && (
+        {files.length > 0 && !expired && (
           <div className="selected-files">
             <div className="list-heading">
               <strong>{link ? 'Shared files' : 'Your files'}</strong>
@@ -443,7 +622,22 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
       </section>
 
       <aside className="panel options-panel">
-        {link && !editing ? (
+        {link && expired ? (
+          <div className="result" ref={resultRef}>
+            <span className="eyebrow">SHARE ENDED</span>
+            <h2>Link expired.</h2>
+            <p className="subtle">
+              This link and QR code are no longer available.
+            </p>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={resetHome}
+            >
+              Share more
+            </button>
+          </div>
+        ) : link && !editing ? (
           <div className="result" ref={resultRef}>
             <span className="eyebrow">READY TO SHARE</span>
             <h2>Your link is ready.</h2>
@@ -472,18 +666,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
                 className="share-more-button"
                 type="button"
                 disabled={busy}
-                onClick={() => {
-                  setFiles([])
-                  setUploadedFiles([])
-                  setLink('')
-                  setExpiresAt('')
-                  setQr('')
-                  setOwner(null)
-                  setError('')
-                  setNotice('')
-                  setToken('')
-                  setChallengeReset((value) => value + 1)
-                }}
+                onClick={resetHome}
               >
                 Share more
               </button>

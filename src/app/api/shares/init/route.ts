@@ -11,7 +11,7 @@ import {
   tokenHash,
   verifyTurnstile,
 } from '@/features/shares/server/security'
-import { uploadUrl } from '@/lib/server/storage'
+import { uploadUrls } from '@/lib/server/storage'
 
 export const runtime = 'nodejs'
 
@@ -19,6 +19,7 @@ type InputFile = { name?: unknown; size?: unknown; type?: unknown }
 
 export async function POST(request: NextRequest) {
   let step = 'request'
+  const started = performance.now()
   try {
     const body = await request.json()
     const input = body.files as InputFile[]
@@ -83,13 +84,12 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       )
     }
+    const verified = performance.now()
 
-    step = 'database'
-    await ensureShareIndexes()
+    step = 'database or file storage'
     const uploadToken = randomId(24)
     const slug = randomSlug()
     const now = new Date()
-    const collection = await shares()
     const record = {
       uploadId,
       slug,
@@ -107,20 +107,29 @@ export async function POST(request: NextRequest) {
       uploadExpiresAt: new Date(now.getTime() + 12 * 60_000),
     }
 
-    step = 'database or file storage'
+    let databaseTime = 0
+    let signingTime = 0
     const [, uploads] = await Promise.all([
-      collection.insertOne(record),
-      Promise.all(
-        files.map(async (file) => ({
-          key: file.key,
-          url: await uploadUrl(file.key, file.type, file.size),
-          type: file.type,
-        })),
-      ),
+      (async () => {
+        const startedDatabase = performance.now()
+        await ensureShareIndexes()
+        const collection = await shares()
+        await collection.insertOne(record)
+        databaseTime = performance.now() - startedDatabase
+      })(),
+      uploadUrls(files).then((result) => {
+        signingTime = performance.now() - verified
+        return result
+      }),
     ])
     return NextResponse.json(
-      { uploadId, uploadToken, uploads },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { uploadId, uploadToken, slug, uploads },
+      {
+        headers: {
+          'Cache-Control': 'no-store',
+          'Server-Timing': `security;dur=${(verified - started).toFixed(1)}, database;dur=${databaseTime.toFixed(1)}, signing;dur=${signingTime.toFixed(1)}`,
+        },
+      },
     )
   } catch (error) {
     if (process.env.NODE_ENV !== 'production')

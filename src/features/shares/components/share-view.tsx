@@ -24,8 +24,15 @@ async function downloadZip(
     })
     ;(async () => {
       try {
+        let current = files
+        let refreshedAt = Date.now()
         for (const [index, file] of files.entries()) {
-          const current = await refreshUrls()
+          if (Date.now() - refreshedAt > 30_000) {
+            const refreshed = await refreshUrls()
+            if (!refreshed) throw new Error('The share has expired.')
+            current = refreshed
+            refreshedAt = Date.now()
+          }
           if (!current?.[index]) throw new Error('The share has expired.')
           const response = await fetch(current[index].url)
           if (!response.ok || !response.body)
@@ -73,14 +80,19 @@ export function ShareView({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [expired, setExpired] = useState(false)
+  const [showFloatingDownload, setShowFloatingDownload] = useState(false)
   const attempted = useRef(false)
+  const topDownload = useRef<HTMLButtonElement>(null)
   const onToken = useCallback((value: string) => setToken(value), [])
 
   useEffect(() => {
     fetch(`/api/shares/${encodeURIComponent(slug)}`, { cache: 'no-store' })
       .then(async (response) => {
         const data = await response.json()
-        if (!response.ok) throw new Error(data.error)
+        if (!response.ok) {
+          if (response.status === 404) setExpired(true)
+          throw new Error(data.error)
+        }
         setInfo(data)
       })
       .catch((cause) =>
@@ -91,17 +103,56 @@ export function ShareView({
   }, [slug])
 
   useEffect(() => {
-    if (!info) return
-    const check = () => {
-      if (new Date(info.expiresAt).getTime() <= Date.now()) {
-        setExpired(true)
-        setFiles([])
+    if (!info || expired) return
+    const markExpired = () => {
+      setExpired(true)
+      setFiles([])
+    }
+    const checkStatus = async (expireOnFailure = false) => {
+      try {
+        const response = await fetch(
+          `/api/shares/${encodeURIComponent(slug)}/status`,
+          { cache: 'no-store' },
+        )
+        if (!response.ok) throw new Error('Status unavailable.')
+        const data = await response.json()
+        if (!data.active || new Date(data.expiresAt).getTime() <= Date.now())
+          markExpired()
+        else if (data.expiresAt !== info.expiresAt)
+          setInfo({ ...info, expiresAt: data.expiresAt })
+      } catch {
+        if (expireOnFailure) markExpired()
       }
     }
-    check()
-    const interval = setInterval(check, 1000)
-    return () => clearInterval(interval)
-  }, [info])
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void checkStatus()
+    }
+    const interval = window.setInterval(() => void checkStatus(), 20_000)
+    const timer = window.setTimeout(
+      () => void checkStatus(true),
+      Math.max(0, new Date(info.expiresAt).getTime() - Date.now()),
+    )
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [info, expired, slug])
+
+  useEffect(() => {
+    if (files.length < 2 || expired || !topDownload.current) return
+    const observer = new IntersectionObserver(([entry]) => {
+      setShowFloatingDownload(
+        !entry.isIntersecting && entry.boundingClientRect.top < 0,
+      )
+    })
+    observer.observe(topDownload.current)
+    return () => {
+      observer.disconnect()
+      setShowFloatingDownload(false)
+    }
+  }, [files.length, expired])
 
   const openShare = useCallback(
     async (enteredPin = pin, challenge = token) => {
@@ -120,7 +171,18 @@ export function ShareView({
           },
         )
         const data = await response.json()
-        if (!response.ok) throw new Error(data.error)
+        if (!response.ok) {
+          if (
+            response.status === 404 ||
+            (response.status === 410 &&
+              info &&
+              new Date(info.expiresAt).getTime() <= Date.now())
+          ) {
+            setExpired(true)
+            setFiles([])
+          }
+          throw new Error(data.error)
+        }
         setFiles(data.files)
         return data.files as SharedFile[]
       } catch (cause) {
@@ -134,7 +196,7 @@ export function ShareView({
         setBusy(false)
       }
     },
-    [pin, slug, token],
+    [info, pin, slug, token],
   )
 
   useEffect(() => {
@@ -248,6 +310,16 @@ export function ShareView({
         )}
         {files.length > 0 && !expired && (
           <div className="download-list">
+            {files.length > 1 && (
+              <button
+                ref={topDownload}
+                className="primary-button download-all"
+                disabled={busy}
+                onClick={() => void getAll()}
+              >
+                {busy ? 'Preparing…' : 'Download all'}
+              </button>
+            )}
             {files.map((file, index) => (
               <div className="download-row" key={`${file.name}-${index}`}>
                 <div className="recipient-preview">
@@ -279,18 +351,9 @@ export function ShareView({
                 </button>
               </div>
             ))}
-            {files.length > 1 && (
-              <button
-                className="primary-button"
-                disabled={busy}
-                onClick={() => void getAll()}
-              >
-                {busy ? 'Preparing…' : 'Download all as ZIP'}
-              </button>
-            )}
           </div>
         )}
-        {error && (
+        {error && !expired && (
           <p className="error" role="alert">
             {error}
           </p>
@@ -301,6 +364,17 @@ export function ShareView({
           </p>
         )}
       </section>
+      {showFloatingDownload && files.length > 1 && !expired && (
+        <button
+          className="floating-download"
+          type="button"
+          aria-label="Download all files"
+          disabled={busy}
+          onClick={() => void getAll()}
+        >
+          ↓ All
+        </button>
+      )}
     </main>
   )
 }

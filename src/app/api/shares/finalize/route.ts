@@ -6,6 +6,7 @@ import { objectSize } from '@/lib/server/storage'
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
+  const started = performance.now()
   try {
     const body = await request.json()
     if (
@@ -28,6 +29,7 @@ export async function POST(request: NextRequest) {
         { error: 'Upload expired or invalid.' },
         { status: 404 },
       )
+    const lookedUp = performance.now()
 
     const actualSizes = await Promise.all(
       share.files.map((file) => objectSize(file.key)),
@@ -42,6 +44,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       )
     }
+    const checked = performance.now()
     const expiresAt = new Date(Date.now() + share.durationMinutes * 60_000)
     const updated = await collection.findOneAndUpdate(
       {
@@ -59,7 +62,12 @@ export async function POST(request: NextRequest) {
       )
     return NextResponse.json(
       { slug: share.slug, expiresAt },
-      { headers: { 'Cache-Control': 'no-store' } },
+      {
+        headers: {
+          'Cache-Control': 'no-store',
+          'Server-Timing': `lookup;dur=${(lookedUp - started).toFixed(1)}, files;dur=${(checked - lookedUp).toFixed(1)}, finish;dur=${(performance.now() - checked).toFixed(1)}`,
+        },
+      },
     )
   } catch {
     return NextResponse.json(
