@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#10231c"/>
+      <stop offset="0.52" stop-color="#101514"/>
+      <stop offset="1" stop-color="#101820"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="matrix(680 400 -270 460 15 0)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6dffb0" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#6dffb0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#21352a"/>
+      <stop offset="1" stop-color="#18221d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#background)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <circle cx="1000" cy="310" r="240" fill="#c8fa79" opacity=".035"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="88" y="112" fill="#f4f7f2" font-size="43" font-weight="800" letter-spacing="-2">DROPIT</text>
+    <circle cx="267" cy="70" r="5" fill="#c8fa79"/>
+    <text x="88" y="280" fill="#f4f7f2" font-size="76" font-weight="750" letter-spacing="-4">Drop files.</text>
+    <text x="88" y="365" fill="#a9b2aa" font-size="76" font-weight="750" letter-spacing="-4">Share simply.</text>
+    <text x="92" y="429" fill="#c8fa79" font-size="23" font-weight="700" letter-spacing="2.5">PRIVATE FILE SHARING</text>
+    <text x="92" y="475" fill="#a9b2aa" font-size="24">Short links. Your files. Your rules.</text>
+  </g>
+  <g transform="translate(755 130)">
+    <rect x="34" y="24" width="330" height="350" rx="28" fill="#080d0b" opacity=".32"/>
+    <rect x="20" y="10" width="330" height="350" rx="28" fill="url(#tile)" stroke="#405247" stroke-width="2"/>
+    <rect x="54" y="48" width="262" height="156" rx="18" fill="#17221c" stroke="#34473b"/>
+    <path d="M181 83v66m0 0-26-26m26 26 26-26" fill="none" stroke="#c8fa79" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="54" y="230" width="262" height="43" rx="12" fill="#c8fa79"/>
+    <text x="185" y="258" text-anchor="middle" fill="#111915" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">Create share link</text>
+    <rect x="54" y="292" width="122" height="38" rx="11" fill="#23352a" stroke="#536b58"/>
+    <rect x="194" y="292" width="122" height="38" rx="11" fill="#23352a" stroke="#536b58"/>
+    <circle cx="90" cy="311" r="6" fill="#c8fa79"/>
+    <path d="M213 311h42" stroke="#b2c0b3" stroke-width="5" stroke-linecap="round"/>
+    <path d="M268 305l8 6-8 6" fill="none" stroke="#b2c0b3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <path d="M88 548h1024" stroke="#34443b" stroke-width="2"/>
+  <text x="90" y="586" fill="#839087" font-family="Arial, Helvetica, sans-serif" font-size="18">dropsit.tech</text>
+</svg>
