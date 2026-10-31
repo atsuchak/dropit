@@ -15,7 +15,7 @@ export async function POST(
 ) {
   try {
     const { slug } = await context.params
-    if (!/^[A-Za-z0-9_-]{12}$/.test(slug)) {
+    if (!/^(?:[a-z]{11}|[A-Za-z0-9_-]{12})$/.test(slug)) {
       return NextResponse.json(
         { error: 'This share is unavailable or expired.' },
         { status: 404 },
@@ -45,6 +45,11 @@ export async function POST(
 
     const alreadyAdmitted = share.accessSessions.includes(sessionHash)
     if (!alreadyAdmitted) {
+      if (share.accessCount >= share.accessLimit)
+        return NextResponse.json(
+          { error: 'Access limit reached.' },
+          { status: 410 },
+        )
       if (!(await verifyTurnstile(body.turnstileToken))) {
         return NextResponse.json(
           { error: 'Security check failed.' },

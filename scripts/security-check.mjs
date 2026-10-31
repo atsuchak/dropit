@@ -9,11 +9,12 @@ const source = await readFile(
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ESNext },
 }).outputText
-const { randomId, tokenHash, hashPin, checkPin } = await import(
+const { randomId, randomSlug, tokenHash, hashPin, checkPin } = await import(
   `data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`
 )
 
 assert.match(randomId(), /^[A-Za-z0-9_-]{12}$/)
+assert.match(randomSlug(), /^[a-z]{11}$/)
 assert.notEqual(tokenHash('first'), tokenHash('second'))
 const stored = hashPin('1234')
 assert.equal(checkPin('1234', stored), true)

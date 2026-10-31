@@ -1,12 +1,21 @@
 import {
   createHash,
   randomBytes,
+  randomInt,
   scryptSync,
   timingSafeEqual,
 } from 'node:crypto'
 
 export function randomId(bytes = 9) {
   return randomBytes(bytes).toString('base64url')
+}
+
+export function randomSlug() {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz'
+  return Array.from(
+    { length: 11 },
+    () => alphabet[randomInt(alphabet.length)],
+  ).join('')
 }
 
 export function tokenHash(token: string) {
