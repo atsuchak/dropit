@@ -30,15 +30,36 @@ export async function POST(request: NextRequest) {
             uploadExpiresAt: { $lte: now },
           },
           { status: 'uploading', uploadExpiresAt: { $lte: now } },
+          { status: 'deleting', uploadExpiresAt: { $lte: now } },
         ],
       })
       .limit(50)
       .toArray()
     let deleted = 0
     for (const share of expired) {
-      await deleteObjects(share.files.map((file) => file.key))
+      await deleteObjects([
+        ...share.files.map((file) => file.key),
+        ...(share.pendingFiles ?? []).map((file) => file.key),
+        ...(share.retiredKeys ?? []),
+      ])
       await collection.deleteOne({ _id: share._id, status: share.status })
       deleted++
+    }
+    const retired = await collection
+      .find({
+        status: 'ready',
+        expiresAt: { $gt: now },
+        uploadExpiresAt: { $lte: now },
+        'retiredKeys.0': { $exists: true },
+      })
+      .limit(50)
+      .toArray()
+    for (const share of retired) {
+      await deleteObjects(share.retiredKeys ?? [])
+      await collection.updateOne(
+        { _id: share._id, status: 'ready', uploadExpiresAt: { $lte: now } },
+        { $set: { retiredKeys: [] } },
+      )
     }
     return NextResponse.json({ deleted })
   } catch {
