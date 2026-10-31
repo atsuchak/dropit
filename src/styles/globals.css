@@ -325,6 +325,9 @@ label .hint {
   font-weight: 750;
   margin-top: 28px;
 }
+.expired-share-button {
+  justify-content: center;
+}
 .primary-button:hover:not(:disabled) {
   background: #ddffab;
 }

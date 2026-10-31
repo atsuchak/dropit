@@ -151,6 +151,11 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
         setRestoring(false)
         return
       }
+      if (new Date(saved.expiresAt).getTime() <= Date.now()) {
+        sessionStorage.removeItem(SAVED_SHARE_KEY)
+        setRestoring(false)
+        return
+      }
       const shareLink = `${window.location.origin}/${saved.slug}`
       setOwner({ slug: saved.slug, token: saved.token })
       setLink(shareLink)
@@ -163,16 +168,13 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
         accessLimit: saved.accessLimit,
         pin: saved.pin,
       })
-      if (new Date(saved.expiresAt).getTime() <= Date.now()) {
-        setExpired(true)
-      }
       try {
         const response = await fetch(`/api/shares/${saved.slug}/manage`, {
           headers: { Authorization: `Bearer ${saved.token}` },
           cache: 'no-store',
         })
         if (response.status === 410 || response.status === 404) {
-          setExpired(true)
+          resetHome()
           return
         }
         const data = await response.json()
@@ -630,7 +632,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
               This link and QR code are no longer available.
             </p>
             <button
-              className="primary-button"
+              className="primary-button expired-share-button"
               type="button"
               onClick={resetHome}
             >
