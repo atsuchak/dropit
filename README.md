@@ -1,6 +1,8 @@
 # Dropit
 
-Temporary file sharing in one Next.js App Router project. A share supports up to 20 files and 100 MB total. The default lifetime is five minutes, with options from 30 seconds to 24 hours. The default access limit is one browser session.
+Temporary file sharing in one Next.js App Router project. A share supports up to 20 files and 100 MB total. The default lifetime is five minutes, with a custom duration from one minute to twelve hours. The default access limit is one page visit.
+
+New share links use an eleven-letter slug at the site root. Existing `/s/` links continue to work. The sender can add or remove files, edit settings, or delete a link while the creation page remains open. Editing keeps the same link. Removed files are excluded from the share immediately, and Blob deletion is attempted immediately. Cleanup retries removed Blob objects after signed upload URLs expire. Deletion blocks access immediately and removes Blob files, then scheduled cleanup removes the temporary MongoDB record after the signed upload URL expires.
 
 ## Local setup
 

@@ -8,10 +8,8 @@ export default function Home() {
         <Link className="brand" href="/">
           DROPIT<span>●</span>
         </Link>
-        <span>Temporary by design.</span>
       </header>
       <UploadForm siteKey={process.env.TURNSTILE_SITE_KEY} />
-      <footer>Simple. Private. Gone when it should be.</footer>
     </main>
   )
 }

@@ -7,6 +7,8 @@ type TurnstileApi = {
     element: HTMLElement,
     options: {
       sitekey: string
+      appearance: 'interaction-only'
+      theme: 'dark'
       callback: (token: string) => void
       'expired-callback': () => void
     },
@@ -60,6 +62,8 @@ export function Turnstile({
       if (cancelled || widget || !container.current || !window.turnstile) return
       widget = window.turnstile.render(container.current, {
         sitekey: siteKey,
+        appearance: 'interaction-only',
+        theme: 'dark',
         callback: onToken,
         'expired-callback': () => onToken(''),
       })

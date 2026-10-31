@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Zip, ZipPassThrough } from 'fflate'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Turnstile } from './turnstile'
+import { formatSize } from '../format-size'
 
 type SharedFile = { name: string; size: number; type: string; url: string }
 type ShareInfo = { hasPin: boolean; expiresAt: string }
@@ -181,17 +183,21 @@ export function ShareView({
 
   return (
     <main className="recipient-shell">
-      <Link className="brand" href="/">
-        DROPIT<span>●</span>
-      </Link>
+      <header className="recipient-header">
+        <Link className="brand" href="/">
+          DROPIT<span>●</span>
+        </Link>
+      </header>
       <section className="panel recipient-panel">
-        <span className="eyebrow">SHARED WITH YOU</span>
+        <span className="eyebrow">PRIVATE SHARE</span>
         <h1>
           {expired
             ? 'This share expired.'
             : error && !info
               ? 'Share unavailable.'
-              : 'Your files are here.'}
+              : files.length
+                ? 'Your files are ready.'
+                : 'Opening your files.'}
         </h1>
         {info && !expired && (
           <p className="subtle">
@@ -228,11 +234,7 @@ export function ShareView({
                 {busy ? 'Opening…' : 'Open share'}
               </button>
             )}
-            {!info.hasPin && (
-              <p className="hint">
-                Opening automatically after the security check.
-              </p>
-            )}
+            {!info.hasPin && <p className="hint">Checking access…</p>}
             {!info.hasPin && error && (
               <button
                 className="text-button"
@@ -248,9 +250,25 @@ export function ShareView({
           <div className="download-list">
             {files.map((file, index) => (
               <div className="download-row" key={`${file.name}-${index}`}>
-                <div>
+                <div className="recipient-preview">
+                  {file.type.startsWith('image/') ? (
+                    <Image
+                      src={file.url}
+                      unoptimized
+                      alt={`${file.name} preview`}
+                      width={76}
+                      height={76}
+                    />
+                  ) : (
+                    <span>
+                      {file.name.split('.').pop()?.slice(0, 4).toUpperCase() ||
+                        'FILE'}
+                    </span>
+                  )}
+                </div>
+                <div className="download-meta">
                   <strong>{file.name}</strong>
-                  <span>{(file.size / 1024 / 1024).toFixed(1)} MB</span>
+                  <span>{formatSize(file.size)}</span>
                 </div>
                 <button
                   aria-label={`Download ${file.name}`}
