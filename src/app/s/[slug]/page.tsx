@@ -1,7 +1,18 @@
 import { ShareView } from '@/features/shares/components/share-view'
 import type { Metadata } from 'next'
+import { openGraphMetadata } from '@/features/shares/metadata'
 
-export const metadata: Metadata = { robots: { index: false, follow: false } }
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  return {
+    robots: { index: false, follow: false },
+    openGraph: openGraphMetadata(`/s/${slug}`),
+  }
+}
 
 export default async function SharePage({
   params,

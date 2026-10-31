@@ -1,32 +1,21 @@
 import type { Metadata } from 'next'
+import {
+  openGraphMetadata,
+  siteDescription,
+  siteTitle,
+} from '@/features/shares/metadata'
 import '../styles/globals.css'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dropsit.tech'),
-  title: 'Dropit | Simple file sharing',
-  description:
-    'Private file sharing with short links, QR codes, and expiry controls.',
+  title: siteTitle,
+  description: siteDescription,
   icons: { icon: '/favicon.svg' },
-  openGraph: {
-    type: 'website',
-    siteName: 'Dropit',
-    title: 'Dropit | Simple file sharing',
-    description:
-      'Private file sharing with short links, QR codes, and expiry controls.',
-    images: [
-      {
-        url: '/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: 'Dropit. Drop files. Share simply.',
-      },
-    ],
-  },
+  openGraph: openGraphMetadata('/'),
   twitter: {
     card: 'summary_large_image',
-    title: 'Dropit | Simple file sharing',
-    description:
-      'Private file sharing with short links, QR codes, and expiry controls.',
+    title: siteTitle,
+    description: siteDescription,
     images: ['/og-image.png'],
   },
 }
