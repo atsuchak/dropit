@@ -1,0 +1,8 @@
+{
+  "name": "dropit-cleanup",
+  "main": "scripts/cleanup-worker.mjs",
+  "compatibility_date": "2026-10-30",
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
+}
