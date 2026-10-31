@@ -7,6 +7,7 @@ import {
 import {
   hashPin,
   randomId,
+  randomSlug,
   tokenHash,
   verifyTurnstile,
 } from '@/features/shares/server/security'
@@ -30,8 +31,8 @@ export async function POST(request: NextRequest) {
       input.length < 1 ||
       input.length > 20 ||
       !Number.isFinite(durationMinutes) ||
-      durationMinutes < 0.5 ||
-      durationMinutes > 1440 ||
+      durationMinutes < 1 ||
+      durationMinutes > 720 ||
       !Number.isInteger(accessLimit) ||
       accessLimit < 1 ||
       accessLimit > 100 ||
@@ -86,14 +87,16 @@ export async function POST(request: NextRequest) {
     step = 'database'
     await ensureShareIndexes()
     const uploadToken = randomId(24)
-    const slug = randomId()
+    const slug = randomSlug()
     const now = new Date()
     const collection = await shares()
-    await collection.insertOne({
+    const record = {
       uploadId,
       slug,
-      status: 'uploading',
+      status: 'uploading' as const,
       files,
+      pendingFiles: [],
+      retiredKeys: [],
       durationMinutes,
       accessLimit,
       accessCount: 0,
@@ -102,16 +105,19 @@ export async function POST(request: NextRequest) {
       uploadTokenHash: tokenHash(uploadToken),
       createdAt: now,
       uploadExpiresAt: new Date(now.getTime() + 12 * 60_000),
-    })
+    }
 
-    step = 'file storage'
-    const uploads = await Promise.all(
-      files.map(async (file) => ({
-        key: file.key,
-        url: await uploadUrl(file.key, file.type, file.size),
-        type: file.type,
-      })),
-    )
+    step = 'database or file storage'
+    const [, uploads] = await Promise.all([
+      collection.insertOne(record),
+      Promise.all(
+        files.map(async (file) => ({
+          key: file.key,
+          url: await uploadUrl(file.key, file.type, file.size),
+          type: file.type,
+        })),
+      ),
+    ])
     return NextResponse.json(
       { uploadId, uploadToken, uploads },
       { headers: { 'Cache-Control': 'no-store' } },
