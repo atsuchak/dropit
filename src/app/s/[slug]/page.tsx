@@ -9,5 +9,5 @@ export default async function SharePage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  return <ShareView slug={slug} />
+  return <ShareView slug={slug} siteKey={process.env.TURNSTILE_SITE_KEY} />
 }

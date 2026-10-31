@@ -56,7 +56,13 @@ async function downloadZip(
   setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
 
-export function ShareView({ slug }: { slug: string }) {
+export function ShareView({
+  slug,
+  siteKey,
+}: {
+  slug: string
+  siteKey?: string
+}) {
   const [info, setInfo] = useState<ShareInfo | null>(null)
   const [files, setFiles] = useState<SharedFile[]>([])
   const [pin, setPin] = useState('')
@@ -208,7 +214,11 @@ export function ShareView({ slug }: { slug: string }) {
                 />
               </label>
             )}
-            <Turnstile key={challengeReset} onToken={onToken} />
+            <Turnstile
+              key={challengeReset}
+              siteKey={siteKey}
+              onToken={onToken}
+            />
             {info.hasPin && (
               <button
                 className="primary-button"
