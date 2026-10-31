@@ -41,7 +41,7 @@ async function filesFromEntry(entry: Entry): Promise<File[]> {
   return files
 }
 
-export function UploadForm() {
+export function UploadForm({ siteKey }: { siteKey?: string }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
   const [files, setFiles] = useState<File[]>([])
@@ -289,7 +289,7 @@ export function UploadForm() {
           One access opens the whole share. Refreshing in the same browser keeps
           that access until expiry.
         </p>
-        <Turnstile key={challengeReset} onToken={onToken} />
+        <Turnstile key={challengeReset} siteKey={siteKey} onToken={onToken} />
         <button
           className="primary-button"
           type="button"

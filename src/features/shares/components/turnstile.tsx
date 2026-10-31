@@ -40,9 +40,14 @@ function loadScript() {
   return scriptPromise
 }
 
-export function Turnstile({ onToken }: { onToken: (token: string) => void }) {
+export function Turnstile({
+  siteKey,
+  onToken,
+}: {
+  siteKey?: string
+  onToken: (token: string) => void
+}) {
   const container = useRef<HTMLDivElement>(null)
-  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
 
   useEffect(() => {
     if (!siteKey) {

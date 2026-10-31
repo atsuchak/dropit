@@ -10,7 +10,7 @@ export default function Home() {
         </Link>
         <span>Temporary by design.</span>
       </header>
-      <UploadForm />
+      <UploadForm siteKey={process.env.TURNSTILE_SITE_KEY} />
       <footer>Simple. Private. Gone when it should be.</footer>
     </main>
   )
