@@ -642,7 +642,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
             <span className="eyebrow">READY TO SHARE</span>
             <h2>Your link is ready.</h2>
             <a className="result-link" href={link} title={link}>
-              {link}
+              {link.replace(/^https?:\/\//, '')}
             </a>
             {expiresAt && (
               <p className="result-expiry">
