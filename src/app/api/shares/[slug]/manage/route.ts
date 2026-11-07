@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { shares } from '@/features/shares/server/model'
 import { hashPin, randomId, tokenHash } from '@/features/shares/server/security'
+import { isValidSlug } from '@/features/shares/slug'
 import {
   deleteObjects,
   downloadUrls,
@@ -22,7 +23,7 @@ export async function GET(
   try {
     const { slug } = await context.params
     const token = ownerToken(request)
-    if (!/^(?:[a-z]{11}|[A-Za-z0-9_-]{12})$/.test(slug) || !token)
+    if (!isValidSlug(slug) || !token)
       return NextResponse.json({ error: 'Share unavailable.' }, { status: 404 })
     const collection = await shares()
     const share = await collection.findOne({
@@ -71,7 +72,7 @@ export async function POST(
   try {
     const { slug } = await context.params
     const token = ownerToken(request)
-    if (!/^(?:[a-z]{11}|[A-Za-z0-9_-]{12})$/.test(slug) || !token)
+    if (!isValidSlug(slug) || !token)
       return NextResponse.json({ error: 'Share unavailable.' }, { status: 404 })
 
     const body = await request.json()
@@ -189,7 +190,7 @@ export async function PATCH(
   try {
     const { slug } = await context.params
     const token = ownerToken(request)
-    if (!/^(?:[a-z]{11}|[A-Za-z0-9_-]{12})$/.test(slug) || !token)
+    if (!isValidSlug(slug) || !token)
       return NextResponse.json({ error: 'Share unavailable.' }, { status: 404 })
 
     const body = await request.json()
@@ -323,7 +324,7 @@ export async function DELETE(
   try {
     const { slug } = await context.params
     const token = ownerToken(request)
-    if (!/^(?:[a-z]{11}|[A-Za-z0-9_-]{12})$/.test(slug) || !token)
+    if (!isValidSlug(slug) || !token)
       return NextResponse.json({ error: 'Share unavailable.' }, { status: 404 })
 
     const collection = await shares()

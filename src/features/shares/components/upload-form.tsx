@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import Image from 'next/image'
 import { formatSize } from '../format-size'
+import { isValidCustomSlug, isValidSlug } from '../slug'
 import { Turnstile } from './turnstile'
 
 const MAX_BYTES = 100 * 1024 * 1024
@@ -103,6 +104,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
   >([])
   const [durationInput, setDurationInput] = useState('5m')
   const [accessLimit, setAccessLimit] = useState(1)
+  const [customSlug, setCustomSlug] = useState('')
   const [pin, setPin] = useState('')
   const [token, setToken] = useState('')
   const [challengeReset, setChallengeReset] = useState(0)
@@ -144,7 +146,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
         return
       }
       if (
-        !/^[a-z]{11}$/.test(saved.slug) ||
+        !isValidSlug(saved.slug) ||
         !/^[A-Za-z0-9_-]{32}$/.test(saved.token)
       ) {
         sessionStorage.removeItem(SAVED_SHARE_KEY)
@@ -301,6 +303,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
           })),
           durationMinutes,
           accessLimit,
+          customSlug: customSlug.trim() || undefined,
           pin: pin || undefined,
           turnstileToken: token,
         }),
@@ -499,6 +502,7 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
   function resetHome() {
     sessionStorage.removeItem(SAVED_SHARE_KEY)
     setFiles([])
+    setCustomSlug('')
     setUploadedFiles([])
     setLink('')
     setExpiresAt('')
@@ -770,16 +774,42 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
             {durationInput && durationMinutes === null && (
               <p className="error">Use a time between 1m and 12h.</p>
             )}
-            <label>
-              Access limit
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={accessLimit}
-                onChange={(event) => setAccessLimit(Number(event.target.value))}
-              />
-            </label>
+            <div className={`share-settings-row${editing ? ' single' : ''}`}>
+              <label>
+                Access limit
+                <input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={accessLimit}
+                  onChange={(event) =>
+                    setAccessLimit(Number(event.target.value))
+                  }
+                />
+              </label>
+              {!editing && (
+                <label>
+                  Custom URL <span className="optional">optional</span>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={customSlug}
+                    onChange={(event) =>
+                      setCustomSlug(event.target.value.toLowerCase())
+                    }
+                    placeholder="3–30 letters, numbers or hyphens"
+                  />
+                </label>
+              )}
+            </div>
+            {customSlug.trim() && !isValidCustomSlug(customSlug.trim()) && (
+              <p className="error">
+                {customSlug.trim() === 'api'
+                  ? 'This URL is reserved.'
+                  : 'Use 3–30 letters or digits; hyphens inside.'}
+              </p>
+            )}
             <label>
               PIN <span className="optional">optional</span>
               <input
@@ -807,6 +837,9 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
                 (!editing && !token) ||
                 durationMinutes === null ||
                 (pin.length > 0 && !/^\d{4,12}$/.test(pin)) ||
+                (!editing &&
+                  !!customSlug.trim() &&
+                  !isValidCustomSlug(customSlug.trim())) ||
                 accessLimit < 1 ||
                 accessLimit > 100
               }

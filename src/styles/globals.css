@@ -347,6 +347,17 @@ label .hint {
   background: #c8fa79;
   color: #142018;
 }
+.share-settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+  gap: 12px;
+}
+.share-settings-row.single {
+  grid-template-columns: 1fr;
+}
+.share-settings-row label {
+  min-width: 0;
+}
 .optional {
   float: right;
   color: #9eaa9f;

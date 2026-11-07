@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { shares } from '@/features/shares/server/model'
+import { isValidSlug } from '@/features/shares/slug'
 
 export const runtime = 'nodejs'
 
@@ -9,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { slug } = await context.params
-    if (!/^(?:[a-z]{11}|[A-Za-z0-9_-]{12})$/.test(slug))
+    if (!isValidSlug(slug))
       return NextResponse.json(
         { active: false },
         { headers: { 'Cache-Control': 'no-store' } },

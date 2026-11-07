@@ -12,6 +12,7 @@ import {
   verifyTurnstile,
 } from '@/features/shares/server/security'
 import { uploadUrls } from '@/lib/server/storage'
+import { isValidCustomSlug } from '@/features/shares/slug'
 
 export const runtime = 'nodejs'
 
@@ -19,6 +20,7 @@ type InputFile = { name?: unknown; size?: unknown; type?: unknown }
 
 export async function POST(request: NextRequest) {
   let step = 'request'
+  let customSlugRequested = false
   const started = performance.now()
   try {
     const body = await request.json()
@@ -26,6 +28,10 @@ export async function POST(request: NextRequest) {
     const durationMinutes = Number(body.durationMinutes ?? 5)
     const accessLimit = Number(body.accessLimit ?? 1)
     const pin = body.pin
+    const customSlug =
+      typeof body.customSlug === 'string'
+        ? body.customSlug.trim().toLowerCase()
+        : body.customSlug
 
     if (
       !Array.isArray(input) ||
@@ -37,6 +43,9 @@ export async function POST(request: NextRequest) {
       !Number.isInteger(accessLimit) ||
       accessLimit < 1 ||
       accessLimit > 100 ||
+      (customSlug !== undefined &&
+        (typeof customSlug !== 'string' ||
+          (customSlug !== '' && !isValidCustomSlug(customSlug)))) ||
       (pin !== undefined &&
         (typeof pin !== 'string' || !/^\d{4,12}$/.test(pin)))
     ) {
@@ -45,6 +54,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       )
     }
+    customSlugRequested = Boolean(customSlug)
 
     let total = 0
     const uploadId = randomId(18)
@@ -88,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     step = 'database or file storage'
     const uploadToken = randomId(24)
-    const slug = randomSlug()
+    const slug = customSlug || randomSlug()
     const now = new Date()
     const record = {
       uploadId,
@@ -132,13 +142,22 @@ export async function POST(request: NextRequest) {
       },
     )
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production')
-      console.error(`Share preparation failed during ${step}:`, error)
     const failure = error as {
       name?: string
       code?: string | number
       cause?: { code?: string | number }
     }
+    if (failure?.code === 11000)
+      return NextResponse.json(
+        {
+          error: customSlugRequested
+            ? 'This custom URL is already taken. Choose another one.'
+            : 'Could not create a unique URL. Try again.',
+        },
+        { status: 409 },
+      )
+    if (process.env.NODE_ENV !== 'production')
+      console.error(`Share preparation failed during ${step}:`, error)
     return NextResponse.json(
       {
         error: `Could not prepare upload: ${step} failed.`,

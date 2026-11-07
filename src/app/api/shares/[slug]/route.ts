@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { shares } from '@/features/shares/server/model'
 import { randomId } from '@/features/shares/server/security'
+import { isValidSlug } from '@/features/shares/slug'
 
 export const runtime = 'nodejs'
 
@@ -10,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { slug } = await context.params
-    if (!/^(?:[a-z]{11}|[A-Za-z0-9_-]{12})$/.test(slug)) {
+    if (!isValidSlug(slug)) {
       return NextResponse.json(
         { error: 'This share is unavailable or expired.' },
         { status: 404 },
