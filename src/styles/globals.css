@@ -10,9 +10,14 @@
 body {
   margin: 0;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(circle at 14% 2%, #1c3028 0, transparent 32%),
     radial-gradient(circle at 92% 18%, #1d2831 0, transparent 30%), #0d1113;
+}
+body > main {
+  flex: 1;
 }
 button,
 input,
@@ -55,6 +60,45 @@ a {
   vertical-align: top;
   margin-left: 4px;
   letter-spacing: 0;
+}
+.site-footer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
+  width: min(1200px, calc(100% - 40px));
+  margin: 48px auto 0;
+  padding: 20px 2px 24px;
+  border-top: 1px solid #34413b;
+  color: #a7ada6;
+  font-size: 12px;
+}
+.site-footer p {
+  grid-column: 2;
+  margin: 0;
+  text-align: center;
+}
+.footer-links {
+  grid-column: 3;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.footer-links a {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+.footer-links a:hover,
+.footer-links a:focus-visible {
+  background: #23332a;
+  color: #c8fa79;
+}
+.footer-links svg {
+  width: 20px;
+  height: 20px;
 }
 .upload-layout {
   display: grid;
@@ -580,8 +624,17 @@ label .hint {
 }
 @media (max-width: 480px) {
   .site-shell,
-  .recipient-shell {
+  .recipient-shell,
+  .site-footer {
     width: min(100% - 24px, 1200px);
+  }
+  .site-footer {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .site-footer p,
+  .footer-links {
+    grid-column: 1;
   }
   .upload-panel,
   .options-panel,
