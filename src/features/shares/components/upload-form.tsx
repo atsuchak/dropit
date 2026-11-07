@@ -528,13 +528,18 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
       <section className="panel upload-panel">
         <span className="eyebrow">PRIVATE FILE SHARING</span>
         <h1>
-          {expired
-            ? 'Link expired.'
-            : editing
-              ? 'Update your files.'
-              : link
-                ? 'Files ready.'
-                : 'Drop files. Get a link.'}
+          {expired ? (
+            'Link expired.'
+          ) : editing ? (
+            'Update your files.'
+          ) : link ? (
+            'Files ready.'
+          ) : (
+            <>
+              <span className="desktop-only">Drop files. Get a link.</span>
+              <span className="mobile-only">Choose files. Get a link.</span>
+            </>
+          )}
         </h1>
         {(!link || editing) && (
           <>
@@ -553,8 +558,11 @@ export function UploadForm({ siteKey }: { siteKey?: string }) {
               }}
             >
               <span className="drop-icon">↑</span>
-              <strong>Drop files here</strong>
-              <span>or click to browse</span>
+              <strong>
+                <span className="desktop-only">Drop files here</span>
+                <span className="mobile-only">Choose files</span>
+              </strong>
+              <span className="desktop-only">or click to browse</span>
             </div>
             <input
               ref={fileInput}
