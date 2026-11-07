@@ -190,8 +190,11 @@ h2 {
   border-radius: 18px;
   background: #c8fa79;
   color: #122015;
-  font-size: 34px;
-  line-height: 1;
+}
+.drop-icon svg {
+  width: 32px;
+  height: 32px;
+  stroke-width: 1.8;
 }
 .text-button {
   display: block;
